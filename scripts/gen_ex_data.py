@@ -13,6 +13,9 @@ N_CLASSES = 3
 
 out_path = os.path.abspath(os.path.dirname(__file__) + "/../files")
 
+if not os.path.exists(out_path):
+    os.mkdir(out_path)
+
 dfs = []
 for cls in range(N_CLASSES):
     tmp = pd.DataFrame()
