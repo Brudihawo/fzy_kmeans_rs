@@ -1,7 +1,7 @@
 use ndarray::Array2;
+use std::collections::BTreeMap;
 use std::env;
 use term_size;
-use std::collections::HashMap;
 
 mod lib;
 use lib::algo;
@@ -46,11 +46,47 @@ impl ArgType {
     fn is_none(&self) -> bool {
         !self.is_some()
     }
-}
 
-enum ArgResult {
-    Ok(ArgType),
-    Err,
+    fn to_string(&self) -> Result<String, ()> {
+        if self.is_some() {
+            return Ok(match self {
+                ArgType::FloatingNumber(val) => format!("{}", val.unwrap()),
+                ArgType::StringType(val) => format!("{}", val.as_ref().unwrap()),
+                ArgType::SizeType(val) => format!("{}", val.unwrap()),
+            })
+        }
+        Err(())
+    }
+
+    fn get_flt(&self) -> Result<f64, ()>{
+        if self.is_none() {
+            return Err(())
+        }
+        match self {
+            ArgType::FloatingNumber(val) => Ok(val.unwrap()),
+            _ => Err(())
+        }
+    }
+
+    fn get_str(&self) -> Result<String, ()>{
+        if self.is_none() {
+            return Err(())
+        }
+        match self {
+            ArgType::StringType(val) => Ok(val.clone().unwrap()),
+            _ => Err(())
+        }
+    }
+
+    fn get_size(&self) -> Result<usize, ()>{
+        if self.is_none() {
+            return Err(())
+        }
+        match self {
+            ArgType::SizeType(val) => Ok(val.unwrap()),
+            _ => Err(())
+        }
+    }
 }
 
 struct CmdlineArgument {
@@ -102,72 +138,56 @@ impl CmdlineArgument {
     }
 }
 
-const ARG_POSSIBILITIES: [CmdlineArgument; 5] = [
-    CmdlineArgument {
-        description: "Path to input file.",
-        cmdline_expr: "-i",
-        default: ArgType::StringType(None),
-        value: ArgType::StringType(None),
-    },
-    CmdlineArgument {
-        description: "Path to output file.",
-        cmdline_expr: "-i",
-        default: ArgType::StringType(Some(String::from("out.csv"))),
-        value: ArgType::StringType(None),
-    },
-    CmdlineArgument {
-        description: "Number of Clusters",
-        cmdline_expr: "-i",
-        default: ArgType::SizeType(Some(5)),
-        value: ArgType::SizeType(None),
-    },
-    CmdlineArgument {
-        description: "Upper Bound of Iteration number.",
-        cmdline_expr: "-n",
-        default: ArgType::SizeType(Some(10)),
-        value: ArgType::SizeType(None),
-    },
-    CmdlineArgument {
-        description: "Fuzzyfier constant for membership calculation",
-        cmdline_expr: "-q",
-        default: ArgType::FloatingNumber(Some(2.0)),
-        value: ArgType::FloatingNumber(None),
-    },
-];
+fn parse_args<'a>(
+    args: &'a Vec<String>,
+) -> Result<(BTreeMap<String, CmdlineArgument>, bool), (BTreeMap<String, CmdlineArgument>, bool)> {
+    let mut conf = BTreeMap::<String, CmdlineArgument>::new();
 
-fn parse_args<'a>(args: &'a Vec<String>) -> Result<(HashMap<String, CmdlineArgument>, bool), (HashMap<String, CmdlineArgument>, bool)> {
-    let mut conf = HashMap::<String, CmdlineArgument>::new();
-
-    conf.insert("-i".to_string(), CmdlineArgument {
-        description: "Path to input file.",
-        cmdline_expr: "-i",
-        default: ArgType::StringType(None),
-        value: ArgType::StringType(None),
-    });
-    conf.insert("-o".to_string(), CmdlineArgument {
-        description: "Path to output file.",
-        cmdline_expr: "-i",
-        default: ArgType::StringType(Some(String::from("out.csv"))),
-        value: ArgType::StringType(None),
-    });
-    conf.insert("-k".to_string(), CmdlineArgument {
-        description: "Number of Clusters",
-        cmdline_expr: "-i",
-        default: ArgType::SizeType(Some(5)),
-        value: ArgType::SizeType(None),
-    });
-    conf.insert("-n".to_string(), CmdlineArgument {
-        description: "Upper Bound of Iteration number.",
-        cmdline_expr: "-n",
-        default: ArgType::SizeType(Some(10)),
-        value: ArgType::SizeType(None),
-    });
-    conf.insert("-q".to_string(), CmdlineArgument {
-        description: "Fuzzyfier constant for membership calculation",
-        cmdline_expr: "-q",
-        default: ArgType::FloatingNumber(Some(2.0)),
-        value: ArgType::FloatingNumber(None),
-    });
+    conf.insert(
+        "-i".to_string(),
+        CmdlineArgument {
+            description: "Path to input file.",
+            cmdline_expr: "-i",
+            default: ArgType::StringType(None),
+            value: ArgType::StringType(None),
+        },
+    );
+    conf.insert(
+        "-o".to_string(),
+        CmdlineArgument {
+            description: "Path to output file.",
+            cmdline_expr: "-o",
+            default: ArgType::StringType(Some(String::from("out.csv"))),
+            value: ArgType::StringType(None),
+        },
+    );
+    conf.insert(
+        "-k".to_string(),
+        CmdlineArgument {
+            description: "Number of Clusters",
+            cmdline_expr: "-k",
+            default: ArgType::SizeType(Some(5)),
+            value: ArgType::SizeType(None),
+        },
+    );
+    conf.insert(
+        "-n".to_string(),
+        CmdlineArgument {
+            description: "Upper Bound of Iteration number.",
+            cmdline_expr: "-n",
+            default: ArgType::SizeType(Some(10)),
+            value: ArgType::SizeType(None),
+        },
+    );
+    conf.insert(
+        "-q".to_string(),
+        CmdlineArgument {
+            description: "Fuzzyfier constant for membership calculation",
+            cmdline_expr: "-q",
+            default: ArgType::FloatingNumber(Some(2.0)),
+            value: ArgType::FloatingNumber(None),
+        },
+    );
 
     for val in conf.values_mut() {
         val.value = val.default.clone();
@@ -203,7 +223,7 @@ fn parse_args<'a>(args: &'a Vec<String>) -> Result<(HashMap<String, CmdlineArgum
     }
 }
 
-fn print_help(config: HashMap<String, CmdlineArgument>) {
+fn print_help(config: BTreeMap<String, CmdlineArgument>) {
     const PARAM_TITLE_STR: &str = "Parameter";
     const H_ITEM_SEP: usize = 2;
 
@@ -242,7 +262,6 @@ fn print_help(config: HashMap<String, CmdlineArgument>) {
     }
 }
 
-// TODO: command line parameters, use command line input
 fn main() {
     match parse_args(&env::args().collect()) {
         Err((args, print)) => {
@@ -258,14 +277,19 @@ fn main() {
             }
         }
         Ok((args, _)) => {
-            // let fname = args["-i"].value.
-            // let input_vals: Array2<f64> = read_csv(String::from("files/sample_data.csv"));
-            // let clusters = algo::cluster_k_means_fuzzy(args["-n"].value, n_iter, fuzzifier, &input_vals);
-            // let out_vals = algo::compute_nearest(&input_vals, &clusters);
-            // let mut memberships = Array2::<f64>::zeros((out_vals.dim().0, n_clusters));
-            // algo::compute_memberships(fuzzifier, &input_vals, &clusters, &mut memberships);
+            let infname = args["-i"].value.get_str().unwrap();
+            let ofname = args["-o"].value.get_str().unwrap();
+            let n_iter = args["-n"].value.get_size().unwrap();
+            let n_clusters = args["-k"].value.get_size().unwrap();
+            let fuzzifier = args["-q"].value.get_flt().unwrap();
 
-            // to_csv(out_vals, String::from("files/predicted_classes.csv"), b';');
+            let input_vals: Array2<f64> = read_csv(infname);
+            let clusters = algo::cluster_k_means_fuzzy(n_clusters, n_iter, fuzzifier, &input_vals);
+            let out_vals = algo::compute_nearest(&input_vals, &clusters);
+            let mut memberships = Array2::<f64>::zeros((out_vals.dim().0, n_clusters));
+            algo::compute_memberships(fuzzifier, &input_vals, &clusters, &mut memberships);
+
+            to_csv(out_vals, String::from(ofname), b';');
         }
     }
     // let n_clusters: usize = 3;
